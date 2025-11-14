@@ -4,8 +4,6 @@ namespace Poker.Interfaces
 {
     public interface IBettingService
     {
-        public void PassAction(Player player);
-
         public void Check(Player player);
 
         public void Call(Player player);

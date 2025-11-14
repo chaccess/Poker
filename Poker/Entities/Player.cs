@@ -1,5 +1,6 @@
-﻿using Poker.Services;
-using Poker.Services.CombinationCalculator;
+﻿using Poker.Services.BettingService;
+using Poker.Services.CombinationService;
+using Poker.ValueObjects;
 
 namespace Poker.Entities
 {
@@ -15,7 +16,7 @@ namespace Poker.Entities
 
         public PlayerPosition? Position { get; set; }
 
-        public BettingState BettingState { get; set; }
+        public PlayerBettingState BettingState { get; set; }
 
         public CombinationResult CombinationResult { get; set; } = new CombinationResult(CombinationType.None, []);
     }

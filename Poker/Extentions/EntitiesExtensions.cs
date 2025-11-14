@@ -1,9 +1,6 @@
 ﻿using Poker.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Poker.ValueObjects;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Poker.Extentions
 {

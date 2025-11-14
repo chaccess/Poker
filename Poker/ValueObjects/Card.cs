@@ -1,4 +1,4 @@
-﻿namespace Poker.Entities
+﻿namespace Poker.ValueObjects
 {
     public class Card(int r, int s) : IComparable
     {

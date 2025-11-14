@@ -1,10 +1,16 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Poker.Interfaces;
+using System.ComponentModel.DataAnnotations;
 
 namespace Poker.Entities
 {
     public class Table : BaseEntity
     {
-        public Table(TableStatus status, GameState initialState)
+        private readonly object _lock = new();
+        private GameState ThisGameState;
+        private readonly Dictionary<(GameState, GameStateTrigger), (GameState next, Action? onTransition)> _transitions;
+        private readonly IBettingService _bettingService;
+
+        public Table(TableStatus status, GameState initialState, IBettingService bettingService)
         {
             Croupier = new Croupier("John");
             Players = [];
@@ -12,15 +18,10 @@ namespace Poker.Entities
             Status = status;
             _transitions = [];
             ConfigureTransitions();
+            _bettingService = bettingService;
         }
 
-        private readonly object _lock = new();
-
         public static readonly int MaxPlayers = 6;
-
-        private GameState ThisGameState;
-
-        private readonly Dictionary<(GameState, GameStateTrigger), (GameState next, Action? onTransition)> _transitions;
 
         public TableStatus Status { get; set; }
 

@@ -1,10 +1,10 @@
-﻿using Poker.Entities;
-using Poker.Interfaces;
+﻿using Poker.Interfaces;
+using Poker.ValueObjects;
 using System.Reflection;
 
-namespace Poker.Services.CombinationCalculator
+namespace Poker.Services.CombinationService
 {
-    public class CombinationCalculator : ICombinationCalculator
+    public class CombinationService : ICombinationCalculator
     {
         /// <summary>
         /// Returns combination from hand + desk cards

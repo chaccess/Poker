@@ -1,18 +1,18 @@
-﻿using Poker.Entities;
-using Poker.Interfaces;
-using Poker.Services.CombinationCalculator;
+﻿using Poker.Interfaces;
+using Poker.Services.CombinationService;
+using Poker.ValueObjects;
 
 namespace Tests
 {
     [TestFixture]
     public class CombinationCalculatorTests
     {
-        private CombinationCalculator _calculator = null!;
+        private CombinationService _calculator = null!;
 
         [SetUp]
         public void Setup()
         {
-            _calculator = new CombinationCalculator();
+            _calculator = new CombinationService();
         }
 
         [TestCaseSource(nameof(GetCombinationTestData))]

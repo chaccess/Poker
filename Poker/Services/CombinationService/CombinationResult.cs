@@ -1,6 +1,6 @@
-﻿using Poker.Entities;
+﻿using Poker.ValueObjects;
 
-namespace Poker.Services.CombinationCalculator
+namespace Poker.Services.CombinationService
 {
     public class CombinationResult(CombinationType type, List<Card> combinationCards)
     {

@@ -1,11 +1,11 @@
 ﻿using Poker.Entities;
 using Poker.Extentions;
 using Poker.Services;
-using Poker.Services.CombinationCalculator;
+using Poker.Services.CombinationService;
 
 var croupier = new Croupier("John");
 
-var calculator = new CombinationCalculator();
+var calculator = new CombinationService();
 
 
 var desk = croupier.DealFlop();

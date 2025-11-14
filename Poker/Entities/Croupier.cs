@@ -1,11 +1,13 @@
 ﻿using Poker.Interfaces;
+using Poker.ValueObjects;
 
 namespace Poker.Entities
 {
-    public class Croupier
+    public class Croupier : BaseEntity
     {
         public Croupier(string name)
         {
+            Id = new Guid();
             Name = name;
             GetNewDeck();
             ShuffleDeck();
