@@ -1,6 +1,6 @@
 ﻿using Poker.Services.BettingService;
 using Poker.Services.CombinationService;
-using Poker.ValueObjects;
+using Poker.Structs;
 
 namespace Poker.Entities
 {

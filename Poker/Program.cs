@@ -3,6 +3,9 @@ using Poker.Extentions;
 using Poker.Services;
 using Poker.Services.CombinationService;
 
+var table = new Table(TableStatus.Normal);
+
+
 var croupier = new Croupier("John");
 
 var calculator = new CombinationService();

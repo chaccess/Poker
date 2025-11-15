@@ -1,9 +1,10 @@
 ﻿using Poker.Entities;
+using System.ComponentModel;
 using System.Numerics;
 
 namespace Poker.Services.BettingService
 {
-    public class BettingRound
+    public class BettingRound : INotifyPropertyChanged
     {
         private readonly List<Player> _activePlayers;
         private int _currentPlayerIndex = 0;
@@ -23,7 +24,17 @@ namespace Poker.Services.BettingService
         }
 
         public Player CurrentPlayer => _activePlayers[_currentPlayerIndex];
-        public BettingState State => _state;
+        public BettingState State
+        {
+            get => _state;
+            set
+            {
+                if (_state == value) return;
+                _state = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(State)));
+            }
+        }
+        public event PropertyChangedEventHandler? PropertyChanged;
         public Dictionary<Player, int> Bets { get; set; } = [];
         public int LastBet => _lastBet;
         public BettingRoundType RoundType { get; set; }

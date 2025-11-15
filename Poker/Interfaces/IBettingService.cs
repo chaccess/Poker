@@ -1,8 +1,9 @@
 ﻿using Poker.Entities;
+using System.ComponentModel;
 
 namespace Poker.Interfaces
 {
-    public interface IBettingService
+    public interface IBettingService : INotifyPropertyChanged
     {
         public void Check(Player player);
 

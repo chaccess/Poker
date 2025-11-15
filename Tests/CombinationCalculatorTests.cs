@@ -1,6 +1,6 @@
 ﻿using Poker.Interfaces;
 using Poker.Services.CombinationService;
-using Poker.ValueObjects;
+using Poker.Structs;
 
 namespace Tests
 {

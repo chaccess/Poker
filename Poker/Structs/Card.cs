@@ -1,24 +1,10 @@
-﻿namespace Poker.ValueObjects
+﻿namespace Poker.Structs
 {
-    public class Card(int r, int s) : IComparable
+    public struct Card(int r, int s)
     {
         public Rank Rank { get; set; } = Enum.Parse<Rank>(r.ToString());
 
         public Suit Suit { get; set; } = Enum.Parse<Suit>(s.ToString());
-
-        public int CompareTo(object? obj)
-        {
-            if (obj == null) return 1;
-
-            if (obj == this) return 0;
-
-            if (obj.GetType() == typeof(Card))
-            {
-                return ((Card)obj).Rank > Rank ? -1 : 1;
-            }
-
-            return 0;
-        }
     }
 
     public enum Rank

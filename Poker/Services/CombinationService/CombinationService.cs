@@ -1,5 +1,5 @@
 ﻿using Poker.Interfaces;
-using Poker.ValueObjects;
+using Poker.Structs;
 using System.Reflection;
 
 namespace Poker.Services.CombinationService

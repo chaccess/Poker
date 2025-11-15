@@ -1,5 +1,5 @@
 ﻿using Poker.Entities;
-using Poker.ValueObjects;
+using Poker.Structs;
 using System.Text;
 
 namespace Poker.Extentions

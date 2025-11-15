@@ -1,4 +1,8 @@
 ﻿using Poker.Interfaces;
+using Poker.Services.BettingService;
+using Poker.Structs;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace Poker.Entities
@@ -6,28 +10,37 @@ namespace Poker.Entities
     public class Table : BaseEntity
     {
         private readonly object _lock = new();
-        private GameState ThisGameState;
+        private GameState GameState;
         private readonly Dictionary<(GameState, GameStateTrigger), (GameState next, Action? onTransition)> _transitions;
-        private readonly IBettingService _bettingService;
+        private BettingService _bettingService = null!;
+        private readonly Croupier _croupier;
+        // разделить список игроков на активных и всех, что за столом
+        private readonly List<Player> _players;
+        private readonly List<Card> _desc;
+        private int _bank;
+        private List<Player> _winners;
 
-        public Table(TableStatus status, GameState initialState, IBettingService bettingService)
+        public Table(TableStatus status, GameState? initialState = null)
         {
-            Croupier = new Croupier("John");
-            Players = [];
-            ThisGameState = initialState;
+            _croupier = new Croupier("John");
+            _players = [];
+            _desc = [];
+            _winners = [];
+            GameState = initialState ?? GameState.Initialized;
             Status = status;
             _transitions = [];
             ConfigureTransitions();
-            _bettingService = bettingService;
+            Init();
         }
 
         public static readonly int MaxPlayers = 6;
-
         public TableStatus Status { get; set; }
-
-        public required Croupier Croupier { get; set; }
-
-        public required List<Player> Players { get; set; }
+        public Croupier Croupier => _croupier;
+        public List<Player> Players => _players;
+        public List<Card> Desc => _desc;
+        public BettingService BettingService => _bettingService;
+        public int Bank => _bank;
+        public List<Player> Winners => _winners;
 
         public void Permit(GameState from, GameStateTrigger trigger, GameState to, Action? onTransition = null)
         {
@@ -36,21 +49,33 @@ namespace Poker.Entities
 
         public void Fire(GameStateTrigger trigger)
         {
-            if (_transitions.TryGetValue((ThisGameState, trigger), out var info))
+            if (_transitions.TryGetValue((GameState, trigger), out var info))
             {
-                Console.WriteLine($"Переход: {ThisGameState} → {info.next}");
+                Console.WriteLine($"Переход: {GameState} → {info.next}");
                 info.onTransition?.Invoke();
-                ThisGameState = info.next;
+                GameState = info.next;
             }
             else
             {
-                Console.WriteLine($"Недопустимый переход: {ThisGameState} + {trigger}");
+                Console.WriteLine($"Недопустимый переход: {GameState} + {trigger}");
             }
         }
 
         private void ConfigureTransitions()
         {
-            Permit(GameState.Initializing, GameStateTrigger.InitCompleted, GameState.DealHands, Init);
+            Permit(GameState.GameEnded, GameStateTrigger.Init, GameState.Initialized, Init);
+            Permit(GameState.Initialized, GameStateTrigger.StartDealHands, GameState.DealHands, DealHands);
+            Permit(GameState.DealHands, GameStateTrigger.StartPreflopBetting, GameState.PreflopBetting, StartBettingRound);
+            Permit(GameState.PreflopBetting, GameStateTrigger.StartDealFlop, GameState.DealFlop, DealFlop);
+            Permit(GameState.DealFlop, GameStateTrigger.StartFlopBetting, GameState.FlopBetting, StartBettingRound);
+            Permit(GameState.FlopBetting, GameStateTrigger.SartDealTurn, GameState.DealTurn, DealTurn);
+            Permit(GameState.DealTurn, GameStateTrigger.StartTurnBetting, GameState.TurnBetting, StartBettingRound);
+            Permit(GameState.TurnBetting, GameStateTrigger.StartDealRiver, GameState.DealRiver, DealRiver);
+            Permit(GameState.DealRiver, GameStateTrigger.StartRiverBetting, GameState.RiverBetting, DealRiver);
+            Permit(GameState.RiverBetting, GameStateTrigger.StartShowDown, GameState.Showdown, Showdown);
+            Permit(GameState.Showdown, GameStateTrigger.StartEvaluateHands, GameState.EvaluateHands, EvaluateHands);
+            Permit(GameState.EvaluateHands, GameStateTrigger.StartPayout, GameState.Payout, Payout);
+            Permit(GameState.Payout, GameStateTrigger.EndGame, GameState.GameEnded, EndGame);
         }
 
         public void AddPlayer(Player player, int seatNumber)
@@ -86,16 +111,12 @@ namespace Poker.Entities
 
         private void Init()
         {
+            _desc.Clear();
             Croupier.Reset();
+            _bank = 0;
+            _winners.Clear();
+            _bettingService = null!;
             CalculatePositions();
-        }
-
-        private void DealHands()
-        {
-            lock (_lock)
-            {
-                Croupier.DealStartHands(Players);
-            }
         }
 
         private void CalculatePositions()
@@ -126,11 +147,70 @@ namespace Poker.Entities
                 }
 
                 var c = 0;
+                var orderList = GetPositionsOrder();
                 foreach (var player in newOrder)
                 {
-                    player.Position = GetPositionsOrder()[c++];
+                    player.Position = orderList[c++];
                 }
             }
+        }
+
+        private void DealHands()
+        {
+            lock (_lock)
+            {
+                Croupier.DealStartHands(Players);
+            }
+        }
+
+        private void StartBettingRound()
+        {
+            _bettingService = new BettingService(Players);
+            _bettingService.SetGameState(GameState);
+            _bettingService.PropertyChanged += OnBettingService_PropertyChanged;
+        }
+
+        private void OnBettingService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs eventArgs)
+        {
+            if (eventArgs.PropertyName == nameof(BettingService.RoundEnded) && BettingService.RoundEnded)
+            {
+                _bank = BettingService.TotalBank;
+            }
+        }
+
+        private void DealFlop()
+        {
+            _desc.AddRange(Croupier.DealFlop());
+        }
+
+        private void DealTurn()
+        {
+            _desc.Add(Croupier.DealTurn());
+        }
+
+        private void DealRiver()
+        {
+            _desc.Add(Croupier.DealRiver());
+        }
+
+        private void Showdown()
+        {
+            // пока не знаю, нужно ли тут что-то(логирование)
+        }
+
+        private void EvaluateHands()
+        {
+            _winners = Croupier.GetWinner(Players, Desc);
+        }
+
+        private void Payout()
+        {
+            _bettingService.GetPrize(Winners);
+        }
+
+        private void EndGame()
+        {
+            // пока не знаю, нужно ли тут что-то(логирование)
         }
 
         private List<PlayerPosition> GetPositionsOrder()
@@ -157,7 +237,7 @@ namespace Poker.Entities
 
     public enum GameState
     {
-        Initializing,
+        Initialized,
         DealHands,
         PreflopBetting,
         DealFlop,
@@ -169,24 +249,24 @@ namespace Poker.Entities
         Showdown,
         EvaluateHands,
         Payout,
-        Reset
+        GameEnded,
     }
 
     public enum GameStateTrigger
     {
-        InitCompleted,
-        DealHandsCompleted,
-        PreflopBettingCompleted,
-        DealFlopCompleted,
-        FlopBettingCompleted,
-        DealTurnCompleted,
-        TurnBettingCompleted,
-        DealRiverCompleted,
-        RiverBettingCompleted,
-        ShowDownCompleted,
-        EvaluateHandsCompleted,
-        PayoutCompleted,
-        ResetCompleted
+        Init,
+        StartDealHands,
+        StartPreflopBetting,
+        StartDealFlop,
+        StartFlopBetting,
+        SartDealTurn,
+        StartTurnBetting,
+        StartDealRiver,
+        StartRiverBetting,
+        StartShowDown,
+        StartEvaluateHands,
+        StartPayout,
+        EndGame
     }
 
     public enum PlayerPosition
