@@ -7,7 +7,7 @@ namespace Poker.Entities
     {
         public Croupier(string name)
         {
-            Id = new Guid();
+            Id = Guid.NewGuid();
             Name = name;
             GetNewDeck();
             ShuffleDeck();

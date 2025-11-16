@@ -1,9 +1,7 @@
-﻿using Poker.Interfaces;
+﻿using Poker.Extentions;
 using Poker.Services.BettingService;
+using Poker.Services.CombinationService;
 using Poker.Structs;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 
 namespace Poker.Entities
 {
@@ -12,35 +10,46 @@ namespace Poker.Entities
         private readonly object _lock = new();
         private GameState GameState;
         private readonly Dictionary<(GameState, GameStateTrigger), (GameState next, Action? onTransition)> _transitions;
-        private BettingService _bettingService = null!;
+        private readonly BettingMechanism _bettingMechanism;
+        private readonly CombinationService _combinationService;
         private readonly Croupier _croupier;
-        // разделить список игроков на активных и всех, что за столом
+        private readonly List<Player> _activePlayers;
         private readonly List<Player> _players;
         private readonly List<Card> _desc;
         private int _bank;
         private List<Player> _winners;
+        private int _lastSBSeat;
+        private Blinds _blinds;
+        private int _lastBet;
 
-        public Table(TableStatus status, GameState? initialState = null)
+        public Table(Blinds startBlinds, TableStatus status, GameState? initialState = null)
         {
             _croupier = new Croupier("John");
+            _combinationService = new CombinationService();
+            _bettingMechanism = new BettingMechanism();
+            _bettingMechanism.PropertyChanged += OnBettingMechanism_PropertyChanged;
+            _blinds = startBlinds;
             _players = [];
+            _activePlayers = [];
             _desc = [];
             _winners = [];
-            GameState = initialState ?? GameState.Initialized;
+            GameState = initialState ?? GameState.WaitingForPlayers;
             Status = status;
             _transitions = [];
+            _lastSBSeat = 0;
             ConfigureTransitions();
-            Init();
         }
 
         public static readonly int MaxPlayers = 6;
         public TableStatus Status { get; set; }
         public Croupier Croupier => _croupier;
         public List<Player> Players => _players;
+        public List<Player> ActivePlayers => _activePlayers;
         public List<Card> Desc => _desc;
-        public BettingService BettingService => _bettingService;
         public int Bank => _bank;
         public List<Player> Winners => _winners;
+        public Blinds Blinds => _blinds;
+        public int LastBet => _lastBet;
 
         public void Permit(GameState from, GameStateTrigger trigger, GameState to, Action? onTransition = null)
         {
@@ -51,19 +60,19 @@ namespace Poker.Entities
         {
             if (_transitions.TryGetValue((GameState, trigger), out var info))
             {
-                Console.WriteLine($"Переход: {GameState} → {info.next}");
+                Console.WriteLine($"Transition: {GameState} => {info.next}");
                 info.onTransition?.Invoke();
                 GameState = info.next;
             }
             else
             {
-                Console.WriteLine($"Недопустимый переход: {GameState} + {trigger}");
+                Console.WriteLine($"Unavalable transition: {GameState} + {trigger}");
             }
         }
 
         private void ConfigureTransitions()
         {
-            Permit(GameState.GameEnded, GameStateTrigger.Init, GameState.Initialized, Init);
+            Permit(GameState.WaitingForPlayers, GameStateTrigger.Init, GameState.Initialized, Init);
             Permit(GameState.Initialized, GameStateTrigger.StartDealHands, GameState.DealHands, DealHands);
             Permit(GameState.DealHands, GameStateTrigger.StartPreflopBetting, GameState.PreflopBetting, StartBettingRound);
             Permit(GameState.PreflopBetting, GameStateTrigger.StartDealFlop, GameState.DealFlop, DealFlop);
@@ -71,11 +80,12 @@ namespace Poker.Entities
             Permit(GameState.FlopBetting, GameStateTrigger.SartDealTurn, GameState.DealTurn, DealTurn);
             Permit(GameState.DealTurn, GameStateTrigger.StartTurnBetting, GameState.TurnBetting, StartBettingRound);
             Permit(GameState.TurnBetting, GameStateTrigger.StartDealRiver, GameState.DealRiver, DealRiver);
-            Permit(GameState.DealRiver, GameStateTrigger.StartRiverBetting, GameState.RiverBetting, DealRiver);
+            Permit(GameState.DealRiver, GameStateTrigger.StartRiverBetting, GameState.RiverBetting, StartBettingRound);
             Permit(GameState.RiverBetting, GameStateTrigger.StartShowDown, GameState.Showdown, Showdown);
             Permit(GameState.Showdown, GameStateTrigger.StartEvaluateHands, GameState.EvaluateHands, EvaluateHands);
             Permit(GameState.EvaluateHands, GameStateTrigger.StartPayout, GameState.Payout, Payout);
             Permit(GameState.Payout, GameStateTrigger.EndGame, GameState.GameEnded, EndGame);
+            Permit(GameState.GameEnded, GameStateTrigger.Reset, GameState.WaitingForPlayers, Reset);
         }
 
         public void AddPlayer(Player player, int seatNumber)
@@ -97,6 +107,16 @@ namespace Poker.Entities
         {
             lock (_lock)
             {
+                if (ActivePlayers.Where(x => x.SeatNumber == seatNumber).Any())
+                {
+                    var playerToRemove = ActivePlayers.Where(p => p.SeatNumber == seatNumber).FirstOrDefault();
+
+                    if (playerToRemove != null)
+                    {
+                        ActivePlayers.Remove(playerToRemove);
+                    }
+                }
+
                 if (Players.Where(x => x.SeatNumber == seatNumber).Any())
                 {
                     var playerToRemove = Players.Where(p => p.SeatNumber == seatNumber).FirstOrDefault();
@@ -109,38 +129,50 @@ namespace Poker.Entities
             }
         }
 
+        public Player GetCurrentPlayer()
+        {
+            return _bettingMechanism.GetCurrentPlayer();
+        }
+
         private void Init()
         {
             _desc.Clear();
-            Croupier.Reset();
+            _croupier.Reset();
             _bank = 0;
             _winners.Clear();
-            _bettingService = null!;
-            CalculatePositions();
+            _activePlayers.Clear();
+            _activePlayers.AddRange(_players.Clone());
+            ResetPlayers();
+            _bettingMechanism.Configure(_players, BettingRoundType.PreflopRound, Blinds);
         }
 
-        private void CalculatePositions()
+        private void ResetPlayers()
         {
             lock (_lock)
             {
-                if (Players.Count == 2)
+                if (ActivePlayers.Count < 2)
                 {
-                    (Players[1].Position, Players[0].Position) = (Players[0].Position, Players[1].Position);
+                    foreach (var player in ActivePlayers)
+                    {
+                        player.BettingState = null;
+                        player.CombinationResult = new(CombinationType.None, []);
+                        player.Hand.Clear();
+                    }
+                    return;
                 }
 
-                var seatOrder = Players.OrderBy(x => x.SeatNumber).ToList();
+                var seatOrder = ActivePlayers.OrderBy(x => x.SeatNumber).ToList();
+                var newSBPlayer = seatOrder.First(x => x.SeatNumber > _lastSBSeat);
+                var firstIndex = Array.IndexOf(seatOrder.ToArray(), newSBPlayer);
+                _lastSBSeat = firstIndex;
 
                 var newOrder = new List<Player>();
-
-                var firstIndex = Array.IndexOf(seatOrder.ToArray(), seatOrder.Where(x => x.Position == PlayerPosition.BTN));
-
-                firstIndex = firstIndex == -1 ? 0 : firstIndex;
 
                 for (int i = 0; i < seatOrder.Count; i++)
                 {
                     newOrder.Add(seatOrder[firstIndex++]);
 
-                    if (firstIndex == seatOrder.Count - 1)
+                    if (firstIndex == seatOrder.Count)
                     {
                         firstIndex = 0;
                     }
@@ -151,6 +183,9 @@ namespace Poker.Entities
                 foreach (var player in newOrder)
                 {
                     player.Position = orderList[c++];
+                    player.BettingState = null;
+                    player.CombinationResult = new(CombinationType.None, []);
+                    player.Hand.Clear();
                 }
             }
         }
@@ -159,22 +194,25 @@ namespace Poker.Entities
         {
             lock (_lock)
             {
-                Croupier.DealStartHands(Players);
+                Croupier.DealStartHands(ActivePlayers);
             }
         }
 
         private void StartBettingRound()
         {
-            _bettingService = new BettingService(Players);
-            _bettingService.SetGameState(GameState);
-            _bettingService.PropertyChanged += OnBettingService_PropertyChanged;
+            _bettingMechanism.SetGameState((GameState)(int)GameState + 1);
         }
 
-        private void OnBettingService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs eventArgs)
+        private void OnBettingMechanism_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs eventArgs)
         {
-            if (eventArgs.PropertyName == nameof(BettingService.RoundEnded) && BettingService.RoundEnded)
+            if (eventArgs.PropertyName == nameof(_bettingMechanism.RoundEnded) && _bettingMechanism.RoundEnded)
             {
-                _bank = BettingService.TotalBank;
+                _bank = _bettingMechanism.TotalBank;
+            }
+
+            if (eventArgs.PropertyName == nameof(_bettingMechanism.LastBet))
+            {
+                _lastBet = _bettingMechanism.LastBet;
             }
         }
 
@@ -195,17 +233,22 @@ namespace Poker.Entities
 
         private void Showdown()
         {
-            // пока не знаю, нужно ли тут что-то(логирование)
+            var active = ActivePlayers.Where(x => x.BettingState != PlayerBettingState.Fold);
+            foreach (var player in active)
+            {
+                player.CombinationResult = _combinationService.GetCombination(player.Hand, Desc);
+            }
         }
 
         private void EvaluateHands()
         {
-            _winners = Croupier.GetWinner(Players, Desc);
+            _winners = Croupier.GetWinner(ActivePlayers.Where(x => x.BettingState != PlayerBettingState.Fold).ToList(), Desc);
         }
 
         private void Payout()
         {
-            _bettingService.GetPrize(Winners);
+            _bettingMechanism.GetPrize(Winners);
+            _bank = 0;
         }
 
         private void EndGame()
@@ -213,12 +256,57 @@ namespace Poker.Entities
             // пока не знаю, нужно ли тут что-то(логирование)
         }
 
+        private void Reset()
+        {
+        }
+
+        public void MakePlayerAction(Guid playerId, BettingTrigger bettingTrigger, int bet = 0)
+        {
+            var actingPlayer = _activePlayers.FirstOrDefault(x => x.Id == playerId) ?? throw new MakePlayerActionException($"No players with id = {playerId} found.");
+            try
+            {
+                if (bettingTrigger == BettingTrigger.Call)
+                {
+                    _bettingMechanism.Call(actingPlayer);
+                }
+                else if (bettingTrigger == BettingTrigger.Raise)
+                {
+                    _bettingMechanism.Raise(actingPlayer, bet);
+                }
+                else if (bettingTrigger == BettingTrigger.AllIn)
+                {
+                    _bettingMechanism.AllIn(actingPlayer);
+                }
+                else if (bettingTrigger == BettingTrigger.Check)
+                {
+                    _bettingMechanism.Check(actingPlayer);
+                }
+                else if (bettingTrigger == BettingTrigger.Fold)
+                {
+                    _bettingMechanism.Fold(actingPlayer);
+                }
+            }
+            catch (NullReferenceException nre)
+            {
+                throw new MakePlayerActionException(nre.Message);
+            }
+            catch (InvalidOperationException ioe)
+            {
+                throw new MakePlayerActionException(ioe.Message);
+            }
+            catch (Exception e)
+            {
+                throw new MakePlayerActionException(e.Message);
+            }
+        }
+
         private List<PlayerPosition> GetPositionsOrder()
         {
             lock (_lock)
             {
-                return Players.Count switch
+                return ActivePlayers.Count switch
                 {
+                    2 => [PlayerPosition.SB, PlayerPosition.BB],
                     3 => [PlayerPosition.SB, PlayerPosition.BB, PlayerPosition.BTN],
                     4 => [PlayerPosition.SB, PlayerPosition.BB, PlayerPosition.CO, PlayerPosition.BTN],
                     5 => [PlayerPosition.SB, PlayerPosition.BB, PlayerPosition.UTG, PlayerPosition.CO, PlayerPosition.BTN],
@@ -237,6 +325,7 @@ namespace Poker.Entities
 
     public enum GameState
     {
+        WaitingForPlayers,
         Initialized,
         DealHands,
         PreflopBetting,
@@ -266,7 +355,8 @@ namespace Poker.Entities
         StartShowDown,
         StartEvaluateHands,
         StartPayout,
-        EndGame
+        EndGame,
+        Reset,
     }
 
     public enum PlayerPosition
@@ -295,5 +385,16 @@ namespace Poker.Entities
         /// Button.
         /// </summary>
         BTN
+    }
+
+    public class MakePlayerActionException : Exception
+    {
+        public MakePlayerActionException() : base()
+        {
+        }
+
+        public MakePlayerActionException(string? message) : base(message)
+        {
+        }
     }
 }

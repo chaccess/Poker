@@ -4,9 +4,16 @@ using Poker.Structs;
 
 namespace Poker.Entities
 {
-    public class Player(string name) : BaseEntity
+    public class Player : BaseEntity
     {
-        public string Name { get; set; } = name;
+        public Player(string name)
+        {
+            Id = Guid.NewGuid();
+            Name = name;
+            Bank = 5000;
+        }
+
+        public string Name { get; set; }
 
         public List<Card> Hand { get; set; } = [];
 
@@ -16,7 +23,7 @@ namespace Poker.Entities
 
         public PlayerPosition? Position { get; set; }
 
-        public PlayerBettingState BettingState { get; set; }
+        public PlayerBettingState? BettingState { get; set; }
 
         public CombinationResult CombinationResult { get; set; } = new CombinationResult(CombinationType.None, []);
     }
