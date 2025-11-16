@@ -1,9 +1,64 @@
 ﻿using Poker.Entities;
 using Poker.Extentions;
-using Poker.Services;
 using Poker.Services.CombinationService;
+using Poker.Structs;
+using Poker.Services.BettingService;
 
-var table = new Table(TableStatus.Normal);
+var table = new Table(new Blinds(10, 20), TableStatus.Normal);
+
+table.AddPlayer(new Player("Max"), 0);
+table.AddPlayer(new Player("Nika"), 1);
+table.AddPlayer(new Player("Maggy"), 3);
+table.AddPlayer(new Player("Olga"), 4);
+table.AddPlayer(new Player("Alexey"), 5);
+
+table.Fire(GameStateTrigger.Init);
+table.Fire(GameStateTrigger.StartDealHands);
+table.Fire(GameStateTrigger.StartPreflopBetting);
+
+var currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Call);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Raise, table.LastBet + 20);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Call);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Call);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Fold);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Call);
+
+table.Fire(GameStateTrigger.StartDealFlop);
+table.Fire(GameStateTrigger.StartFlopBetting);
+
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Check);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Check);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Check);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Check);
+
+table.Fire(GameStateTrigger.SartDealTurn);
+table.Fire(GameStateTrigger.StartTurnBetting);
+
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Raise, table.LastBet + 50);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Fold);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Call);
+currentPlayer = table.GetCurrentPlayer();
+table.MakePlayerAction(currentPlayer.Id, BettingTrigger.Call);
+
+table.Fire(GameStateTrigger.StartDealRiver);
+table.Fire(GameStateTrigger.StartRiverBetting);
+table.Fire(GameStateTrigger.StartShowDown);
+table.Fire(GameStateTrigger.StartEvaluateHands);
+table.Fire(GameStateTrigger.StartPayout);
+
 
 
 var croupier = new Croupier("John");

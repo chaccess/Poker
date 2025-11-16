@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace Poker.Services.CombinationService
 {
-    public class CombinationService : ICombinationCalculator
+    public class CombinationService : ICombinationService
     {
         /// <summary>
         /// Returns combination from hand + desk cards

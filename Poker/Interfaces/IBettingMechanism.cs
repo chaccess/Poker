@@ -3,7 +3,7 @@ using System.ComponentModel;
 
 namespace Poker.Interfaces
 {
-    public interface IBettingService : INotifyPropertyChanged
+    public interface IBettingMechanism : INotifyPropertyChanged
     {
         public void Check(Player player);
 

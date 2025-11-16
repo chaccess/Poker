@@ -60,5 +60,10 @@ namespace Poker.Extentions
 
             return sb.ToString();
         }
+
+        public static List<T> Clone<T>(this List<T> value)
+        {
+            return [.. value];
+        }
     }
 }
