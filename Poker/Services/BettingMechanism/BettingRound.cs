@@ -1,8 +1,8 @@
 ﻿using Poker.Entities;
 using System.ComponentModel;
-using System.Numerics;
+using System.Linq;
 
-namespace Poker.Services.BettingService
+namespace Poker.Services.BettingMechanism
 {
     public class BettingRound : INotifyPropertyChanged
     {
@@ -50,8 +50,10 @@ namespace Poker.Services.BettingService
 
         public void Setup(List<Player> players, BettingRoundType roundType)
         {
-            _activePlayers = players.OrderBy(x => x.Position).ToList();
+            _activePlayers = [.. players.OrderBy(x => x.Position)];
+            _activePlayers.ForEach(x => { x.BettingState = PlayerBettingState.Thinking; });
             _currentPlayerIndex = _activePlayers.IndexOf(_activePlayers.First(x => x.Position == PlayerPosition.SB));
+            CurrentPlayer.AvailableActions = GetAvailableActions(CurrentPlayer);
             RoundType = roundType;
             LastBet = 0;
             _lastRaiser = null;
@@ -84,6 +86,10 @@ namespace Poker.Services.BettingService
         {
             if (_transitions.TryGetValue((_state, trigger), out var info))
             {
+                if (trigger == BettingTrigger.Check && !CanCheck(CurrentPlayer))
+                {
+                    throw new InvalidOperationException("Player can't Check now");
+                }
                 Console.WriteLine($"{_state} -> {info.next} ({trigger})");
                 _currenTtrigger = trigger;
                 _currentBet = currentBet;
@@ -107,6 +113,7 @@ namespace Poker.Services.BettingService
             _bets.Add(player, bet);
             player.BettingState = player.Position == PlayerPosition.BB ? PlayerBettingState.BBlind : PlayerBettingState.SBlind;
             LastBet = bet > _lastBet ? bet : _lastBet;
+            player.Bank -= bet;
             Console.WriteLine($"{CurrentPlayer.Name} blind: {_lastBet}");
             MoveToNextPlayer();
         }
@@ -143,6 +150,11 @@ namespace Poker.Services.BettingService
 
             if (_bets.TryGetValue(CurrentPlayer, out int value))
             {
+                if (LastBet - value == 0)
+                {
+                    Check();
+                    return;
+                }
                 _bets[CurrentPlayer] += LastBet - value;
                 CurrentPlayer.Bank -= LastBet - value;
             }
@@ -205,14 +217,9 @@ namespace Poker.Services.BettingService
 
         private void Check()
         {
-            if (_bets.Count == 0 || _bets[CurrentPlayer] == _lastBet)
-            {
-                CurrentPlayer.BettingState = PlayerBettingState.Check;
-                Console.WriteLine($"{CurrentPlayer.Name} checked");
-                return;
-            }
-
-            throw new InvalidOperationException("Player can't CHECK at this betting round state");
+            CurrentPlayer.BettingState = PlayerBettingState.Check;
+            Console.WriteLine($"{CurrentPlayer.Name} checked");
+            return;
         }
 
         private void FoldCards()
@@ -224,15 +231,40 @@ namespace Poker.Services.BettingService
 
         private void MoveToNextPlayer()
         {
+            CurrentPlayer.AvailableActions.Clear();
             _currentPlayerIndex = (_currentPlayerIndex + 1) % _activePlayers.Count;
 
             if (AllPlayersActed())
                 Fire(BettingTrigger.RoundEnd);
             else
             {
+
+                CurrentPlayer.AvailableActions = GetAvailableActions(CurrentPlayer);
                 CurrentPlayer.BettingState = PlayerBettingState.Thinking;
+
+                Console.WriteLine();
                 Console.WriteLine($"Next player: {CurrentPlayer.Name}");
             }
+        }
+
+        private List<PlayerAction> GetAvailableActions(Player player)
+        {
+            var availableActions = Enum.GetValues<PlayerAction>().ToList();
+            if (!CanCheck(player))
+            {
+                availableActions.Remove(PlayerAction.Check);
+            }
+            return availableActions;
+        }
+
+        private bool CanCheck(Player player)
+        {
+            if (Bets.Count < 2 && RoundType == BettingRoundType.PreflopRound) return false;
+            if (Bets.Count == 1 && !Bets.TryGetValue(player, out _)) return false;
+            if (Bets.Count == 0) return true;
+
+
+            return Bets[player] == Bets.Values.Max() || player.BettingState == PlayerBettingState.AllIn;
         }
 
         private void OnRoundComplete()
@@ -256,7 +288,7 @@ namespace Poker.Services.BettingService
             // 3. Проверяем, выровнены ли ставки
             var active_bets = _activePlayers
                 .Where(p => p.BettingState != PlayerBettingState.Fold)
-                .Select(p => _bets.ContainsKey(p) ? _bets[p] : 0)
+                .Select(p => _bets.TryGetValue(p, out int value) ? value : 0)
                 .ToList();
 
             int maxBet = active_bets.Max();

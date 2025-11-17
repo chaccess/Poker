@@ -136,5 +136,63 @@ public class CroupierTests
             new List<Card> { new(12, 0), new(11, 0), new(10, 0), new(7, 1), new(6, 1) },
             new List<Player> { player11 }
         ).SetName("RoyalFlush_beats_StraightFlush");
+
+        var player13 = new Player("Max")
+        {
+            Hand = [new(9, 0), new(2, 1)],
+            CombinationResult = new CombinationResult(CombinationType.Pair, [new(9, 0), new(9, 1)])
+        };
+
+        var player14 = new Player("Nika")
+        {
+            Hand = [new(3, 0), new(13, 1)],
+            CombinationResult = new CombinationResult(CombinationType.Pair, [new(13, 0), new(13, 1)])
+        };
+
+        yield return new TestCaseData(
+            new List<Player> { player13, player14 },
+            new List<Card> { new(2, 2), new(5, 3), new(9, 1), new(12, 2), new(13, 0) },
+            new List<Player> { player14 }
+        ).SetName("Pair_Nines_vs_Pair_Kings");
+
+        var player15 = new Player("Player1")
+        {
+            Hand = [new(2, 0), new(6, 1)], // 2♠, 6♥
+            CombinationResult = new CombinationResult(
+        CombinationType.Flush,
+        [new(14, 0), new(13, 0), new(8, 0), new(5, 0), new(2, 0)] // A♠ K♠ 8♠ 5♠ 2♠
+    )
+        };
+
+        var player16 = new Player("Player2")
+        {
+            Hand = [new(7, 2), new(7, 0)], // 7♦, 7♠
+            CombinationResult = new CombinationResult(
+                CombinationType.Flush,
+                [new(14, 0), new(13, 0), new(9, 3), new(7, 0), new(5, 0)] // A♠ K♠ 9♦ 7♠ 5♠
+            )
+        };
+
+        var player17 = new Player("Player3")
+        {
+            Hand = [new(6, 0), new(9, 0)], // 6♠, 9♠
+            CombinationResult = new CombinationResult(
+                CombinationType.Flush,
+                [new(14, 0), new(13, 0), new(9, 0), new(8, 0), new(6, 0)] // A♠ K♠ 9♠ 8♠ 6♠
+            )
+        };
+
+        yield return new TestCaseData(
+            new List<Player> { player15, player16, player17 },
+            new List<Card>
+            {
+                new(13, 0), // K♠
+                new(14, 0), // A♠
+                new(8, 0),  // 8♠
+                new(10, 3), // 10♣
+                new(5, 0)   // 5♠
+            },
+            new List<Player> { player17 }
+        ).SetName("Flush_ThreePlayers_Player3Wins");
     }
 }

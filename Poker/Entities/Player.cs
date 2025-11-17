@@ -1,4 +1,4 @@
-﻿using Poker.Services.BettingService;
+﻿using Poker.Services.BettingMechanism;
 using Poker.Services.CombinationService;
 using Poker.Structs;
 
@@ -11,6 +11,7 @@ namespace Poker.Entities
             Id = Guid.NewGuid();
             Name = name;
             Bank = 5000;
+            AvailableActions = [];
         }
 
         public string Name { get; set; }
@@ -27,9 +28,24 @@ namespace Poker.Entities
 
         public CombinationResult CombinationResult { get; set; } = new CombinationResult(CombinationType.None, []);
 
+        public List<PlayerAction> AvailableActions
+        {
+            get;
+            set;
+        }
+
         public override string ToString()
         {
             return Name;
         }
+    }
+
+    public enum PlayerAction
+    {
+        Call,
+        Raise,
+        AllIn,
+        Check,
+        Fold
     }
 }

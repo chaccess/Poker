@@ -1,4 +1,5 @@
 ﻿using Poker.Interfaces;
+using Poker.Services.CombinationService;
 using Poker.Structs;
 
 namespace Poker.Entities
@@ -31,7 +32,11 @@ namespace Poker.Entities
 
             var kicker = combinations.Max(GetKicker);
 
-            return [.. condidates.Where(x => x.CombinationResult.CombinationCards.Where(c => c.Rank == kicker).Any())];
+            var handKicker = players.Select(p => p.Hand.Where(c => p.CombinationResult.CombinationCards.Contains(c)).Max(x => x)).Max();
+            if (maxType == CombinationType.Flush)
+                return [.. condidates.Where(x => x.CombinationResult.CombinationCards.Where(c => c.Rank == kicker).Any() && x.CombinationResult.CombinationCards.Where(c => c == handKicker).Any())];
+
+            return [.. condidates.Where(x => x.CombinationResult.CombinationCards.Where(c => c.Rank == kicker).Any() && x.CombinationResult.CombinationCards.Where(c => c.Rank == handKicker.Rank).Any())];
         }
 
         public void Reset()

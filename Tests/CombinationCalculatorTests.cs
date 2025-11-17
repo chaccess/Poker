@@ -149,6 +149,13 @@ namespace Tests
                 CombinationType.Quad,
                 new List<Card> { new(9, 0), new(9, 1), new(9, 2), new(9, 3), new(8, 3) }
             ).SetName("FourOfKind_beats_FullHouse");
+
+            yield return new TestCaseData(
+                new List<Card> { new(8, 1), new(7, 1) },
+                new List<Card> { new(14, 1), new(14, 2), new(10, 3), new(14, 0), new(8, 2) },
+                CombinationType.FullHouse,
+                new List<Card> { new(14, 0), new(14, 1), new(14, 2), new(8, 1), new(8, 2) }
+            ).SetName("Full_House2");
         }
     }
 }
