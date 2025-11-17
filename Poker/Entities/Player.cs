@@ -26,5 +26,10 @@ namespace Poker.Entities
         public PlayerBettingState? BettingState { get; set; }
 
         public CombinationResult CombinationResult { get; set; } = new CombinationResult(CombinationType.None, []);
+
+        public override string ToString()
+        {
+            return Name;
+        }
     }
 }

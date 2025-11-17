@@ -5,6 +5,11 @@
         public Rank Rank { get; set; } = Enum.Parse<Rank>(r.ToString());
 
         public Suit Suit { get; set; } = Enum.Parse<Suit>(s.ToString());
+
+        public override readonly string ToString()
+        {
+            return $"{Rank} {Suit}";
+        }
     }
 
     public enum Rank

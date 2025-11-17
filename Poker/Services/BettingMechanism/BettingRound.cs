@@ -107,6 +107,7 @@ namespace Poker.Services.BettingService
             _bets.Add(player, bet);
             player.BettingState = player.Position == PlayerPosition.BB ? PlayerBettingState.BBlind : PlayerBettingState.SBlind;
             LastBet = bet > _lastBet ? bet : _lastBet;
+            Console.WriteLine($"{CurrentPlayer.Name} blind: {_lastBet}");
             MoveToNextPlayer();
         }
 

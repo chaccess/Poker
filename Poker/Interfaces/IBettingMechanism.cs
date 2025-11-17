@@ -5,16 +5,13 @@ namespace Poker.Interfaces
 {
     public interface IBettingMechanism : INotifyPropertyChanged
     {
+        public void SetBlinds(Player sb, Player bb);
         public void Check(Player player);
-
         public void Call(Player player);
-
         public void Raise(Player player, int bet);
-
         public void AllIn(Player player);
-
         public void Fold(Player player);
-
         public void GetPrize(List<Player> players);
+        public Player GetCurrentPlayer();
     }
 }
