@@ -7,6 +7,7 @@ namespace Poker.Entities
 {
     public class Table : BaseEntity
     {
+        //разобраться нужен ли вообще лок, если _activePlayers создаются заново при Init()
         private readonly object _lock = new();
         private GameState GameState;
         private readonly Dictionary<(GameState, GameStateTrigger), (GameState next, Action? onTransition)> _transitions;
@@ -36,7 +37,7 @@ namespace Poker.Entities
             GameState = initialState ?? GameState.WaitingForPlayers;
             Status = status;
             _transitions = [];
-            _lastSBSeat = 0;
+            _lastSBSeat = -1;
             ConfigureTransitions();
         }
 
@@ -101,8 +102,15 @@ namespace Poker.Entities
                     }
                 }
             }
+            else
+            {
+                Console.WriteLine("No available seats");
+            }
         }
 
+
+        //разобраться, как вытаскивать игрока из игры, если он вышел из-за стола во время раунда.
+        //нужен список таких игроков и фолдить автоматом, когда до него доходит очередь.
         public void RemovePlayer(int seatNumber)
         {
             lock (_lock)
@@ -136,14 +144,17 @@ namespace Poker.Entities
 
         private void Init()
         {
-            _desc.Clear();
-            _croupier.Reset();
-            _bank = 0;
-            _winners.Clear();
-            _activePlayers.Clear();
-            _activePlayers.AddRange(_players.Clone());
-            ResetPlayers();
-            _bettingMechanism.Configure(_players, BettingRoundType.PreflopRound, Blinds);
+            lock (_lock)
+            {
+                _desc.Clear();
+                _croupier.Reset();
+                _bank = 0;
+                _winners.Clear();
+                _activePlayers.Clear();
+                _activePlayers.AddRange(_players.Clone());
+                ResetPlayers();
+                _bettingMechanism.Configure(_players, BettingRoundType.PreflopRound, Blinds);
+            }
         }
 
         private void ResetPlayers()
@@ -163,7 +174,7 @@ namespace Poker.Entities
 
                 var seatOrder = ActivePlayers.OrderBy(x => x.SeatNumber).ToList();
                 var newSBPlayer = seatOrder.First(x => x.SeatNumber > _lastSBSeat);
-                var firstIndex = Array.IndexOf(seatOrder.ToArray(), newSBPlayer);
+                var firstIndex = Array.IndexOf([.. seatOrder], newSBPlayer);
                 _lastSBSeat = firstIndex;
 
                 var newOrder = new List<Player>();
@@ -219,16 +230,19 @@ namespace Poker.Entities
         private void DealFlop()
         {
             _desc.AddRange(Croupier.DealFlop());
+            Console.WriteLine($"Desk: {_desc.ElementsToString()}");
         }
 
         private void DealTurn()
         {
             _desc.Add(Croupier.DealTurn());
+            Console.WriteLine($"Desk: {_desc.ElementsToString()}");
         }
 
         private void DealRiver()
         {
             _desc.Add(Croupier.DealRiver());
+            Console.WriteLine($"Desk: {_desc.ElementsToString()}");
         }
 
         private void Showdown()
@@ -237,12 +251,14 @@ namespace Poker.Entities
             foreach (var player in active)
             {
                 player.CombinationResult = _combinationService.GetCombination(player.Hand, Desc);
+                Console.WriteLine($"{player.Name} - {player.CombinationResult}");
             }
         }
 
         private void EvaluateHands()
         {
-            _winners = Croupier.GetWinner(ActivePlayers.Where(x => x.BettingState != PlayerBettingState.Fold).ToList(), Desc);
+            _winners = Croupier.GetWinner([.. ActivePlayers.Where(x => x.BettingState != PlayerBettingState.Fold)], Desc);
+            Console.WriteLine($"Winners: {_winners.ElementsToString()} with {_winners.First().CombinationResult.CombinationCards.ElementsToString()}");
         }
 
         private void Payout()
@@ -254,6 +270,7 @@ namespace Poker.Entities
         private void EndGame()
         {
             // пока не знаю, нужно ли тут что-то(логирование)
+            Console.WriteLine("Game ended");
         }
 
         private void Reset()

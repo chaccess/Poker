@@ -65,5 +65,18 @@ namespace Poker.Extentions
         {
             return [.. value];
         }
+
+        public static string ElementsToString<T>(this List<T> values)
+        {
+            var sb = new StringBuilder();
+
+            foreach (T v in values)
+            {
+                sb.Append($"{v?.ToString()}, ");
+            }
+            sb.Remove(sb.Length - 2, 2);
+
+            return sb.ToString();
+        }
     }
 }
