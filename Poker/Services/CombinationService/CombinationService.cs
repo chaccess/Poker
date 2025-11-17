@@ -195,10 +195,12 @@ namespace Poker.Services.CombinationService
 
                     j = Array.IndexOf(arr, 3);
                 }
+                else
+                {
+                    i = Array.IndexOf(arr, 3);
 
-                i = Array.IndexOf(arr, 3);
-
-                j = Array.LastIndexOf(arr, 3);
+                    j = Array.LastIndexOf(arr, 3);
+                }
 
                 return new CheckMethodResponse(true, CombinationType.FullHouse, [.. cards.Where(x => x.Rank == (Rank)i || x.Rank == (Rank)j).TakeLast(5)]);
             }

@@ -3,11 +3,11 @@ using Poker.Interfaces;
 using Poker.Structs;
 using System.ComponentModel;
 
-namespace Poker.Services.BettingService
+namespace Poker.Services.BettingMechanism
 {
     public class BettingMechanism : IBettingMechanism
     {
-        private BettingRound _bettingRound;
+        private readonly BettingRound _bettingRound;
         private int _totalBank;
         private bool _roundEnded;
         private readonly List<Player> _players;
@@ -60,6 +60,7 @@ namespace Poker.Services.BettingService
             _players.AddRange(players);
             _bettingRound.Setup(players, roundType);
             _blinds = blinds;
+            RoundEnded = false;
         }
 
         public void SetBlinds(Player sb, Player bb)
@@ -124,8 +125,10 @@ namespace Poker.Services.BettingService
             _bettingRound.Fire(BettingTrigger.NextPlayer);
         }
 
-        public void SetGameState(GameState gameState)
+        public void StartBettingRound(GameState gameState)
         {
+            RoundEnded = false;
+
             var roundType = gameState switch
             {
                 GameState.PreflopBetting => BettingRoundType.PreflopRound,
@@ -135,7 +138,7 @@ namespace Poker.Services.BettingService
                 _ => throw new NotImplementedException()
             };
 
-            _bettingRound.Setup(_players.Where(x => x.BettingState != PlayerBettingState.Fold).ToList(), roundType);
+            _bettingRound.Setup([.. _players.Where(x => x.BettingState != PlayerBettingState.Fold)], roundType);
 
             if (gameState == GameState.PreflopBetting)
                 SetBlinds(_players.First(x => x.Position == PlayerPosition.SB), _players.First(x => x.Position == PlayerPosition.BB));
@@ -164,7 +167,7 @@ namespace Poker.Services.BettingService
             if (eventArgs.PropertyName == nameof(_bettingRound.State) && _bettingRound.State == BettingState.RoundComplete)
             {
                 ProcessAfterBettingRound();
-                _roundEnded = true;
+                RoundEnded = true;
             }
             if (eventArgs.PropertyName == nameof(_bettingRound.LastBet))
             {

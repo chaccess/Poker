@@ -1,10 +1,37 @@
 ﻿namespace Poker.Structs
 {
-    public struct Card(int r, int s)
+    public struct Card(int r, int s) : IComparable<Card>
     {
         public Rank Rank { get; set; } = Enum.Parse<Rank>(r.ToString());
 
         public Suit Suit { get; set; } = Enum.Parse<Suit>(s.ToString());
+
+        public readonly int CompareTo(Card obj)
+        {
+            return Rank.CompareTo(obj.Rank);
+        }
+
+        public static bool operator ==(Card left, Card right)
+        {
+            return left.Rank == right.Rank && left.Suit == right.Suit;
+        }
+
+        public static bool operator !=(Card left, Card right)
+        {
+            return !(left == right);
+        }
+
+        public override readonly bool Equals(object? obj)
+        {
+            if (obj is Card c)
+                return this == c;
+            return false;
+        }
+
+        public override readonly int GetHashCode()
+        {
+            return HashCode.Combine(Rank, Suit);
+        }
 
         public override readonly string ToString()
         {
